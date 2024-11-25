@@ -322,21 +322,24 @@ class ImageClass():
     def __len__(self):
         return len(self.image_paths)
   
-def get_dataset(paths, has_class_directories=True):
-    dataset = []
-    for path in paths.split(':'):
-        path_exp = os.path.expanduser(path)
-        classes = os.listdir(path_exp)
-        classes.sort()
-        nrof_classes = len(classes)
-        for i in range(nrof_classes):
-            class_name = classes[i]
-            facedir = os.path.join(path_exp, class_name)
-            image_paths = get_image_paths(facedir)
+def get_dataset(base_path, has_class_directories=True):
+    dataset = []  # Danh sách chứa tất cả các lớp và hình ảnh
+    # Duyệt qua tất cả thư mục con trong base_path (mỗi thư mục là một nhãn)
+    classes = os.listdir(base_path)
+    classes.sort()
+    # Với mỗi thư mục con (class_name) là một nhãn
+    for class_name in classes:
+        class_path = os.path.join(base_path, class_name)
+        
+        # Kiểm tra nếu thư mục con này là một thư mục thực
+        if os.path.isdir(class_path):
+            # Lấy danh sách các đường dẫn ảnh trong thư mục nhãn
+            image_paths = get_image_paths(class_path)
+            
+            # Thêm nhãn và danh sách đường dẫn ảnh vào dataset
             dataset.append(ImageClass(class_name, image_paths))
-  
+    
     return dataset
-
 def get_image_paths(facedir):
     image_paths = []
     if os.path.isdir(facedir):
@@ -375,7 +378,7 @@ def load_model(model):
     if (os.path.isfile(model_exp)):
         print('Model filename: %s' % model_exp)
         with gfile.FastGFile(model_exp,'rb') as f:
-            graph_def = tf.GraphDef()
+            graph_def = tf.compat.v1.GraphDef()
             graph_def.ParseFromString(f.read())
             tf.import_graph_def(graph_def, name='')
     else:

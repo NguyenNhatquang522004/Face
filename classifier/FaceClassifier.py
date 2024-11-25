@@ -4,23 +4,18 @@ import numpy as np
 from sklearn import neighbors, svm
 
 BASE_DIR = os.path.dirname(__file__) + '/'
-PATH_TO_PKL = 'trained_classifier.pkl'
+PATH_TO_PKL = r'C:\Dataset\FaceRecognition\classifier\trained_classifier.pkl'
 
 
 class FaceClassifier:
     def __init__(self, model_path=None):
 
         self.model = None
-        if model_path is None:
-            return
-        elif model_path == 'default':
-            model_path = BASE_DIR+PATH_TO_PKL
-
         # Load models
-        with open(model_path, 'rb') as f:
+        with open(r'C:\Dataset\FaceRecognition\classifier\trained_classifier.pkl', 'rb') as f:
             self.model = pickle.load(f)
-
     def train(self, X, y, model='knn', save_model_path=None):
+        print(save_model_path)
         if model == 'knn':
             self.model = neighbors.KNeighborsClassifier(3, weights='uniform')
         else:  # svm
@@ -29,7 +24,6 @@ class FaceClassifier:
         if save_model_path is not None:
             with open(save_model_path, 'wb') as f:
                 pickle.dump(self.model, f)
-
     def classify(self, descriptor):
         if self.model is None:
             print('Train the model before doing classifications.')
