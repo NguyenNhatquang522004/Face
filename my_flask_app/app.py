@@ -44,7 +44,6 @@ def delete_label_folder(label):
 def decode_and_save_images(images_base64, label):
     label_folder = os.path.join(base_folder, label)
     os.makedirs(label_folder, exist_ok=True)
-    
     for idx, img_base64 in enumerate(images_base64):
         img_base64 = img_base64.replace("data:image/jpeg;base64,", "")
         image_data = base64.b64decode(img_base64)
@@ -77,11 +76,7 @@ def Training():
     if 'file' not in request.json or 'label' not in request.json:
         return jsonify({'message': 'No file or label provided'}), 400
     try:
-        
-        files = request.json['file']
-        label = request.json['label']
-        delete_label_folder(label)
-        decode_and_save_images(files,label)
+    
         dataset = get_dataset(base_folder)
         print(dataset)
         paths, labels = get_image_paths_and_labels(dataset)
@@ -103,20 +98,17 @@ def Training():
                 continue
             else:
                 print("yes")
-
             cropped_face = img[boxes[0][0]:boxes[0][2], boxes[0][1]:boxes[0][3], :]
             cropped_face_flip = cv2.flip(cropped_face,1)
             features[2*i,:] = face_recognition.recognize(cropped_face)
             features[2*i+1,:] = face_recognition.recognize(cropped_face_flip)
         print('Start training for images')
         face_classfier.train(features, labels, model='svm', save_model_path=OUTPUT_MODEL)
-        delete_label_folder(label)           
+                
         return jsonify({
             'message': 'Images processed successfully',
-            'label': label,
         }), 200
     except Exception as e:
-        delete_label_folder(label) 
         return jsonify({'message': f'Error processing images: {str(e)}'}), 400
 
     
@@ -199,7 +191,7 @@ def recognize_faces():
 
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
-@app.route("/Detect_Tranining", methods=['POST'])
+@app.route("/Detect_check", methods=['POST'])
 def detect():
     try:
         files = request.json['file']
@@ -237,12 +229,12 @@ def detect():
         detection_rate = (detected_count / total_images) * 100
 
         # Kiểm tra tỷ lệ phát hiện
-        success = detection_rate >= 80  # Thành công nếu phát hiện >= 80%
+        success = detection_rate >= 50  # Thành công nếu phát hiện >= 80%
 
         if success:
             # Gửi HTTP request tới route /Training
             training_response = requests.post(
-                url="http://localhost:5000/Training",  # URL tới route /Training
+                url="http://127.0.0.1:5000/Check",  # URL tới route /Training
                 json={
                     "file": files,
                     "label": label
@@ -266,15 +258,28 @@ def detect():
     except Exception as e:
         return jsonify({'message': f'Error processing images: {str(e)}'}), 500
     
-@app.route("/Detect_Check", methods=['POST'])
-def detect_check():
+@app.route("/Detect_Training", methods=['POST'])
+def detect_training():
     try:
+        # Nhận các file ảnh và nhãn từ client
         files = request.json['file']
         label = request.json['label']
         results = []
         detected_count = 0  # Đếm số lượng ảnh phát hiện được khuôn mặt
         total_images = len(files)  # Tổng số ảnh gửi lên
-        detected_images = []
+        detected_images = []  # Lưu các ảnh phát hiện khuôn mặt
+
+        # Đường dẫn cơ sở
+        base_folder = r'C:\Dataset\FaceRecognition'
+        temp_folder = os.path.join(base_folder, 'temp')
+        client_folder = os.path.join(base_folder, 'client')
+        
+        # Kiểm tra và tạo thư mục tạm nếu chưa tồn tại
+        os.makedirs(temp_folder, exist_ok=True)
+
+        # Tạo thư mục con theo nhãn trong thư mục `temp`
+        label_temp_folder = os.path.join(temp_folder, label)
+        os.makedirs(label_temp_folder, exist_ok=True)
 
         for idx, img_base64 in enumerate(files):
             # Giải mã base64
@@ -296,8 +301,23 @@ def detect_check():
                 print("yes")
                 detected_count += 1  # Tăng bộ đếm nếu phát hiện được khuôn mặt
                 results.append({'index': idx, 'status': 'face detected'})
+                
+                # Lưu ảnh đã phát hiện khuôn mặt vào thư mục `temp`
+                temp_image_path = os.path.join(label_temp_folder, f"{label}_{idx}.jpg")
+                cv2.imwrite(temp_image_path, brightened_image)
+                
+                # Kiểm tra thư mục `label` trong `client_folder`
+                label_folder = os.path.join(client_folder, label)
+                
+                # Nếu thư mục chưa tồn tại, tạo thư mục mới
+                if not os.path.exists(label_folder):
+                    os.makedirs(label_folder, exist_ok=True)
+                
+                # Lưu ảnh vào thư mục `label`
+                label_image_path = os.path.join(label_folder, f"{label}_{idx}.jpg")
+                cv2.imwrite(label_image_path, brightened_image)
 
-                # Thêm ảnh đã phát hiện thành công vào danh sách
+                # Thêm ảnh vào danh sách để gửi lại
                 detected_images.append("data:image/jpeg;base64," + base64.b64encode(cv2.imencode('.jpg', brightened_image)[1]).decode('utf-8'))
 
         # Tính tỷ lệ phát hiện khuôn mặt
@@ -307,28 +327,28 @@ def detect_check():
         success = detection_rate >= 80  # Thành công nếu phát hiện >= 80%
 
         if success:
-            # Gửi HTTP request tới route /Training
+            # Gửi HTTP request tới route /Training nếu tỷ lệ phát hiện >= 80%
             training_response = requests.post(
-                url="http://localhost:5000/Check",  # URL tới route /Training
+                url="http://127.0.0.1:5000/Training",  # URL tới route /Training
                 json={
-                    "file": files,
-                    "label": label
+                    "file": files,  # Gửi ảnh ban đầu
+                    "label": label  # Gửi nhãn
                 }
             )
-        
-            
+
             # Xử lý kết quả trả về từ /Training
             if training_response.status_code == 200:
                 training_result = training_response.json()
                 print("Training thành công:", training_result)
             else:
-                print("Lỗi trong quá trình Check:", training_response.json())
+                print("Lỗi trong quá trình Training:", training_response.json())
 
         return jsonify({
             'message': 'Processed images successfully',
-            'results': results,
-            'detection_rate': detection_rate,
-            'success': success
+            'results': results,  # Kết quả phát hiện khuôn mặt cho từng ảnh
+            'detection_rate': detection_rate,  # Tỷ lệ phát hiện khuôn mặt
+            'success': success,  # Thành công nếu phát hiện >= 80%
+            'detected_images': detected_images  # Các ảnh đã phát hiện khuôn mặt
         }), 200
 
     except Exception as e:
@@ -337,6 +357,6 @@ def detect_check():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True  )
 
 

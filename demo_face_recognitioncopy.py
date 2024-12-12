@@ -11,7 +11,7 @@ face_recognition = FaceRecognition()
 face_classifier = FaceClassifier('./classifier/trained_classifier.pkl')
 
 # Đọc ảnh từ file
-image_path = r'C:\Dataset\FaceRecognition\Original Images\Original Images\Natalie Portman\Natalie Portman_0.jpg'  # Thay đổi thành đường dẫn đến ảnh của bạn
+image_path = r'C:\Dataset\FaceRecognition\client\quang\quang_11.jpg'  # Thay đổi thành đường dẫn đến ảnh của bạn
 frame = cv2.imread(image_path)
 
 # Kiểm tra nếu ảnh được tải thành công
